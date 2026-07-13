@@ -1,0 +1,15 @@
+services:
+  web:
+    build: .
+    container_name: badge-manager
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+      - badge_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  badge_data:

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card narrow">
+  <h2>Login</h2>
+  <form method="post" action="{{ url_for('login') }}" class="grid">
+    <label>Password</label>
+    <input type="password" name="password" required>
+    <button class="button" type="submit">Enter</button>
+  </form>
+</section>
+{% endblock %}
