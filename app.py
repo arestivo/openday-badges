@@ -34,6 +34,27 @@ def normalize_base_path(value: str) -> str:
     return cleaned.rstrip("/")
 
 
+class PrefixMiddleware:
+    """Serve the app under a URL prefix by rewriting SCRIPT_NAME/PATH_INFO.
+
+    This must happen at the WSGI layer: Flask resolves the route before
+    before_request hooks run, so rewriting the environ there is too late.
+    """
+
+    def __init__(self, wsgi_app, prefix: str):
+        self.wsgi_app = wsgi_app
+        self.prefix = prefix
+
+    def __call__(self, environ, start_response):
+        path = environ.get("PATH_INFO", "")
+        if path.startswith(self.prefix + "/"):
+            environ["SCRIPT_NAME"] = environ.get("SCRIPT_NAME", "") + self.prefix
+            environ["PATH_INFO"] = path[len(self.prefix) :]
+            return self.wsgi_app(environ, start_response)
+        start_response("302 Found", [("Location", f"{self.prefix}/")])
+        return [b""]
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
@@ -43,23 +64,9 @@ def create_app() -> Flask:
     DB_DIR.mkdir(exist_ok=True)
     init_db()
 
-    @app.context_processor
-    def inject_base_path():
-        return {"base_path": app.config["APPLICATION_ROOT"]}
-
-    @app.before_request
-    def enforce_base_path():
-        base_path = app.config["APPLICATION_ROOT"]
-        if not base_path:
-            return None
-        path = request.path
-        if path == base_path:
-            return redirect(f"{base_path}/")
-        if path.startswith(base_path + "/"):
-            request.environ["SCRIPT_NAME"] = base_path
-            request.environ["PATH_INFO"] = path[len(base_path) :] or "/"
-            return None
-        return redirect(f"{base_path}/")
+    base_path = app.config["APPLICATION_ROOT"]
+    if base_path:
+        app.wsgi_app = PrefixMiddleware(app.wsgi_app, base_path)
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
