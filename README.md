@@ -9,6 +9,7 @@ Web app to manage attendees in SQLite and generate conference badge PNGs from SV
 - Paste/import CSV rows as `name,position,company`
 - Generate one badge (`.png`) per attendee
 - Download an empty badge (no name, company, or position)
+- Download the badge back side (`cracha-back.svg`)
 - Export all badges as a `.zip`
 - `|` in Name/Company/Position forces a line break at that spot; an explicit
   `|` always beats an automatic length-based split when they compete

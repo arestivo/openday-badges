@@ -18,6 +18,7 @@ DB_PATH = DB_DIR / "app.db"
 TEMPLATES_DIR = BASE_DIR
 
 DEFAULT_TEMPLATE = "cracha.svg"
+BACK_TEMPLATE = "cracha-back.svg"
 BIG_NAME_TEMPLATE = "cracha_big_many.svg"
 BIG_COMPANY_TEMPLATE = "cracha_big_company.svg"
 BIG_POSITION_TEMPLATE = "cracha_big_many_position.svg"
@@ -212,6 +213,22 @@ def create_app() -> Flask:
             download_name="empty_badge.png",
         )
 
+    @app.route("/badges/back.png")
+    @login_required
+    def badge_back_png():
+        back_path = TEMPLATES_DIR / BACK_TEMPLATE
+        if not back_path.exists():
+            flash(f"Missing template file: {BACK_TEMPLATE}", "error")
+            return redirect(url_for("index"))
+
+        image = svg_to_png(back_path.read_text(encoding="utf-8"))
+        return send_file(
+            io.BytesIO(image),
+            mimetype="image/png",
+            as_attachment=True,
+            download_name="badge_back.png",
+        )
+
     @app.route("/badges/all.zip")
     @login_required
     def all_badges_zip():
@@ -374,11 +391,14 @@ def generate_badge_png(attendee: sqlite3.Row | dict) -> bytes:
 
     svg_content = template_path.read_text(encoding="utf-8")
     filled_svg = replace_placeholders(svg_content, replacements)
+    return svg_to_png(filled_svg)
 
+
+def svg_to_png(svg_content: str) -> bytes:
     with tempfile.TemporaryDirectory() as tmp:
         svg_path = Path(tmp) / "badge.svg"
         png_path = Path(tmp) / "badge.png"
-        svg_path.write_text(filled_svg, encoding="utf-8")
+        svg_path.write_text(svg_content, encoding="utf-8")
         subprocess.run(
             ["inkscape", str(svg_path), "--export-type=png", "--export-filename", str(png_path)],
             check=True,
