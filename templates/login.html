@@ -1,9 +1,12 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="login-scene">
+  <img class="badger" src="{{ url_for('static', filename='badger.png') }}" alt="The Badge Badger mascot">
+
   <div class="badge-card">
+    <span class="lanyard-clip" aria-hidden="true"></span>
     <span class="lanyard-slot" aria-hidden="true"></span>
-    <p class="eyebrow">Private access</p>
+    <p class="eyebrow">The Badge Badger</p>
     <h1>Hello, admin</h1>
     <p class="hint">Enter the admin password to manage attendees and print badges.</p>
     <form method="post" action="{{ url_for('login') }}" class="stack">

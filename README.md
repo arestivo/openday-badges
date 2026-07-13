@@ -1,4 +1,4 @@
-# Badge Manager
+# The Badge Badger
 
 Web app to manage attendees in SQLite and generate conference badge PNGs from SVG templates.
 

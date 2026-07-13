@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Badge Manager</title>
+    <title>The Badge Badger</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Keania+One&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
       <div class="shell header-inner">
         <a class="wordmark" href="{{ url_for('index') }}">
           <span class="wordmark-badge" aria-hidden="true"></span>
-          <span class="wordmark-text">Badge<em>Manager</em></span>
+          <span class="wordmark-text">Badge<em>Badger</em></span>
         </a>
         {% if session.get('logged_in') %}
         <a class="button ghost-dark" href="{{ url_for('logout') }}">Log out</a>
