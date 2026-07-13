@@ -6,11 +6,12 @@ Web app to manage attendees in SQLite and generate conference badge PNGs from SV
 
 - Password-only login (no username)
 - Add, edit, delete attendees
-- Paste/import CSV rows
+- Paste/import CSV rows as `name,position,company`
 - Generate one badge (`.png`) per attendee
 - Download an empty badge (no name, company, or position)
 - Export all badges as a `.zip`
-- `|` in Name/Company/Position forces line break
+- `|` in Name/Company/Position forces a line break at that spot; an explicit
+  `|` always beats an automatic length-based split when they compete
 - Supports deployment under a subpath via `BASE_PATH`
 - Docker Compose ready
 
@@ -22,6 +23,8 @@ Keep these files in the project root:
 - `cracha_big_many.svg`
 - `cracha_big_many_position.svg`
 - `cracha_big_company.svg`
+- `cracha_big_name_company.svg` (two-line name + two-line company)
+- `cracha_big_name_position.svg` (two-line name + two-line position)
 
 ## Local run with Poetry
 

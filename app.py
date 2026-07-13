@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import zipfile
 from functools import wraps
+from itertools import combinations
 from pathlib import Path
 
 from flask import Flask, flash, redirect, render_template, request, send_file, session, url_for
@@ -20,6 +21,8 @@ DEFAULT_TEMPLATE = "cracha.svg"
 BIG_NAME_TEMPLATE = "cracha_big_many.svg"
 BIG_COMPANY_TEMPLATE = "cracha_big_company.svg"
 BIG_POSITION_TEMPLATE = "cracha_big_many_position.svg"
+BIG_NAME_COMPANY_TEMPLATE = "cracha_big_name_company.svg"
+BIG_NAME_POSITION_TEMPLATE = "cracha_big_name_position.svg"
 
 NAME_LENGTH_THRESHOLD = 18
 OTHER_LENGTH_THRESHOLD = 23
@@ -162,17 +165,13 @@ def create_app() -> Flask:
         with get_db() as conn:
             for row in reader:
                 row = [item.strip() for item in row]
-                if not row:
-                    continue
-                if len(row) < 2:
+                if len(row) < 3:
                     continue
 
-                if row[0].lower() == "name" and row[1].lower() == "company":
+                if row[0].lower() == "name":
                     continue
 
-                name = row[0]
-                company = row[1]
-                position = row[2] if len(row) > 2 else ""
+                name, position, company = row[:3]
                 if not name or not company:
                     continue
                 conn.execute(
@@ -285,85 +284,84 @@ def replace_placeholders(svg_content: str, replacements: dict[str, str]) -> str:
     return svg_content
 
 
-def split_text(text: str, threshold: int) -> tuple[str, str, bool]:
+def split_text(text: str, threshold: int) -> tuple[str, str, bool, bool]:
+    """Split a field into two lines; returns (line1, line2, split, explicit)."""
     value = (text or "").strip()
     if not value:
-        return "", "", False
+        return "", "", False, False
 
     if "|" in value:
         part1, part2 = value.split("|", 1)
-        return part1.strip(), part2.strip(), True
+        return part1.strip(), part2.strip(), True, True
 
     if len(value) <= threshold:
-        return value, "", False
+        return value, "", False, False
 
     parts = value.split()
     if len(parts) <= 1:
-        return value, "", False
+        return value, "", False, False
 
     midpoint = len(parts) // 2
-    return " ".join(parts[:midpoint]), " ".join(parts[midpoint:]), True
+    return " ".join(parts[:midpoint]), " ".join(parts[midpoint:]), True, False
 
 
-def choose_template(name_split: bool, company_split: bool, position_split: bool) -> str:
-    if company_split:
-        return BIG_COMPANY_TEMPLATE
-    if position_split:
-        return BIG_POSITION_TEMPLATE
-    if name_split:
-        return BIG_NAME_TEMPLATE
-    return DEFAULT_TEMPLATE
+# Priority when splits compete for a template slot (highest first).
+FIELD_PRIORITY = ("COMPANY", "POSITION", "NAME")
+
+SPLIT_TEMPLATES = {
+    frozenset(): DEFAULT_TEMPLATE,
+    frozenset({"NAME"}): BIG_NAME_TEMPLATE,
+    frozenset({"COMPANY"}): BIG_COMPANY_TEMPLATE,
+    frozenset({"POSITION"}): BIG_POSITION_TEMPLATE,
+    frozenset({"NAME", "COMPANY"}): BIG_NAME_COMPANY_TEMPLATE,
+    frozenset({"NAME", "POSITION"}): BIG_NAME_POSITION_TEMPLATE,
+}
+
+
+def pick_split_fields(fields: dict) -> frozenset:
+    """Choose the split combination with an existing template.
+
+    Prefer honouring as many splits as possible, then explicit | splits,
+    then the field priority order.
+    """
+    want = [key for key in FIELD_PRIORITY if fields[key][2]]
+    best, best_rank = frozenset(), (-1, -1, -1)
+    for size in range(len(want), 0, -1):
+        for combo in combinations(want, size):
+            chosen = frozenset(combo)
+            if chosen not in SPLIT_TEMPLATES:
+                continue
+            explicit = sum(1 for key in combo if fields[key][3])
+            priority = sum(len(FIELD_PRIORITY) - FIELD_PRIORITY.index(k) for k in combo)
+            rank = (size, explicit, priority)
+            if rank > best_rank:
+                best, best_rank = chosen, rank
+        if best:
+            break
+    return best
 
 
 def build_replacements(attendee: sqlite3.Row | dict) -> dict[str, str]:
-    number = str(attendee["id"])
-    name = attendee["name"]
-    company = attendee["company"]
-    position = attendee["position"]
-
-    name1, name2, name_split = split_text(name, NAME_LENGTH_THRESHOLD)
-    company1, company2, company_split = split_text(company, OTHER_LENGTH_THRESHOLD)
-    position1, position2, position_split = split_text(position, OTHER_LENGTH_THRESHOLD)
-
-    template = choose_template(name_split, company_split, position_split)
-
-    if template == BIG_COMPANY_TEMPLATE:
-        return {
-            "TEMPLATE_FILE": template,
-            "NUMBER": number,
-            "NAME": name,
-            "POSITION": position,
-            "COMPANY1": company1,
-            "COMPANY2": company2,
-        }
-
-    if template == BIG_POSITION_TEMPLATE:
-        return {
-            "TEMPLATE_FILE": template,
-            "NUMBER": number,
-            "NAME": name,
-            "POSITION1": position1,
-            "POSITION2": position2,
-            "COMPANY": company,
-        }
-
-    if template == BIG_NAME_TEMPLATE:
-        return {
-            "TEMPLATE_FILE": template,
-            "NUMBER": number,
-            "NAME1": name1,
-            "NAME2": name2,
-            "POSITION": position,
-            "COMPANY": company,
-        }
-
-    return {
-        "TEMPLATE_FILE": template,
-        "NUMBER": number,
-        "NAME": name,
-        "POSITION": position,
-        "COMPANY": company,
+    fields = {
+        "NAME": split_text(attendee["name"], NAME_LENGTH_THRESHOLD),
+        "COMPANY": split_text(attendee["company"], OTHER_LENGTH_THRESHOLD),
+        "POSITION": split_text(attendee["position"], OTHER_LENGTH_THRESHOLD),
     }
+
+    winners = pick_split_fields(fields)
+
+    replacements = {
+        "TEMPLATE_FILE": SPLIT_TEMPLATES[winners],
+        "NUMBER": str(attendee["id"]),
+    }
+    for key, (part1, part2, split, _explicit) in fields.items():
+        if key in winners:
+            replacements[f"{key}1"] = part1
+            replacements[f"{key}2"] = part2
+        else:
+            # a losing split renders on one line, | replaced by a space
+            replacements[key] = f"{part1} {part2}".strip() if split else part1
+    return replacements
 
 
 def generate_badge_png(attendee: sqlite3.Row | dict) -> bytes:
