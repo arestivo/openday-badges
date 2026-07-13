@@ -2,11 +2,12 @@ import csv
 import io
 import os
 import sqlite3
+import subprocess
+import tempfile
 import zipfile
 from functools import wraps
 from pathlib import Path
 
-import cairosvg
 from flask import Flask, flash, redirect, render_template, request, send_file, session, url_for
 
 
@@ -193,6 +194,18 @@ def create_app() -> Flask:
             download_name=f"{attendee_id}_{safe_name}.png",
         )
 
+    @app.route("/badges/empty.png")
+    @login_required
+    def empty_badge_png():
+        attendee = {"id": "", "name": "", "company": "", "position": ""}
+        image = generate_badge_png(attendee)
+        return send_file(
+            io.BytesIO(image),
+            mimetype="image/png",
+            as_attachment=True,
+            download_name="empty_badge.png",
+        )
+
     @app.route("/badges/all.zip")
     @login_required
     def all_badges_zip():
@@ -295,7 +308,7 @@ def choose_template(name_split: bool, company_split: bool, position_split: bool)
     return DEFAULT_TEMPLATE
 
 
-def build_replacements(attendee: sqlite3.Row) -> dict[str, str]:
+def build_replacements(attendee: sqlite3.Row | dict) -> dict[str, str]:
     number = str(attendee["id"])
     name = attendee["name"]
     company = attendee["company"]
@@ -346,7 +359,7 @@ def build_replacements(attendee: sqlite3.Row) -> dict[str, str]:
     }
 
 
-def generate_badge_png(attendee: sqlite3.Row) -> bytes:
+def generate_badge_png(attendee: sqlite3.Row | dict) -> bytes:
     replacements = build_replacements(attendee)
     template_file = replacements.pop("TEMPLATE_FILE")
     template_path = TEMPLATES_DIR / template_file
@@ -356,7 +369,18 @@ def generate_badge_png(attendee: sqlite3.Row) -> bytes:
 
     svg_content = template_path.read_text(encoding="utf-8")
     filled_svg = replace_placeholders(svg_content, replacements)
-    return cairosvg.svg2png(bytestring=filled_svg.encode("utf-8"))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        svg_path = Path(tmp) / "badge.svg"
+        png_path = Path(tmp) / "badge.png"
+        svg_path.write_text(filled_svg, encoding="utf-8")
+        subprocess.run(
+            ["inkscape", str(svg_path), "--export-type=png", "--export-filename", str(png_path)],
+            check=True,
+            capture_output=True,
+            timeout=120,
+        )
+        return png_path.read_bytes()
 
 
 app = create_app()

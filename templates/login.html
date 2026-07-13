@@ -1,11 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="card narrow">
-  <h2>Login</h2>
-  <form method="post" action="{{ url_for('login') }}" class="grid">
-    <label>Password</label>
-    <input type="password" name="password" required>
-    <button class="button" type="submit">Enter</button>
-  </form>
+<section class="login-scene">
+  <div class="badge-card">
+    <span class="lanyard-slot" aria-hidden="true"></span>
+    <p class="eyebrow">Private access</p>
+    <h1>Hello, admin</h1>
+    <p class="hint">Enter the admin password to manage attendees and print badges.</p>
+    <form method="post" action="{{ url_for('login') }}" class="stack">
+      <label for="password">Admin password</label>
+      <input id="password" type="password" name="password" autocomplete="current-password" autofocus required>
+      <button class="button block" type="submit">Enter</button>
+    </form>
+  </div>
 </section>
 {% endblock %}

@@ -8,6 +8,7 @@ Web app to manage attendees in SQLite and generate conference badge PNGs from SV
 - Add, edit, delete attendees
 - Paste/import CSV rows
 - Generate one badge (`.png`) per attendee
+- Download an empty badge (no name, company, or position)
 - Export all badges as a `.zip`
 - `|` in Name/Company/Position forces line break
 - Supports deployment under a subpath via `BASE_PATH`
@@ -23,6 +24,10 @@ Keep these files in the project root:
 - `cracha_big_company.svg`
 
 ## Local run with Poetry
+
+Badge PNGs are rendered with [Inkscape](https://inkscape.org), so the `inkscape`
+command must be available (the Docker image installs it automatically). The badge
+fonts (Keania One, Alumni Sans SC, Major Mono Display) must also be installed.
 
 1. Install dependencies:
 
@@ -52,6 +57,7 @@ Open `http://localhost:8000`.
 ```bash
 cp .env.example .env
 # edit ADMIN_PASSWORD and SECRET_KEY
+# optionally set EXTERNAL_PORT (host port, defaults to 8000)
 ```
 
 2. Build and run:

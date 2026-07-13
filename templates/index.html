@@ -1,80 +1,118 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="card">
-  <h2>Add attendee</h2>
-  <form method="post" action="{{ url_for('create_attendee') }}" class="grid three">
-    <label>Name</label>
-    <input type="text" name="name" placeholder="Name | Optional second line" required>
-
-    <label>Company</label>
-    <input type="text" name="company" placeholder="Company | Optional second line" required>
-
-    <label>Position (optional)</label>
-    <input type="text" name="position" placeholder="Position | Optional second line">
-
-    <button class="button" type="submit">Create</button>
-  </form>
-</section>
-
-<section class="card">
-  <h2>Import CSV rows</h2>
-  <p class="hint">Paste lines as NAME,COMPANY or NAME,COMPANY,POSITION. Header row is optional.</p>
-  <form method="post" action="{{ url_for('import_attendees') }}" class="grid" enctype="multipart/form-data">
-    <label>Upload CSV file (optional)</label>
-    <input type="file" name="csv_file" accept=".csv,text/csv">
-
-    <label>Or paste CSV rows</label>
-    <textarea name="csv_data" rows="7" placeholder="name,company,position"></textarea>
-    <button class="button" type="submit">Import</button>
-  </form>
-</section>
-
-<section class="card">
-  <div class="split">
-    <h2>Attendees</h2>
-    <a class="button" href="{{ url_for('all_badges_zip') }}">Download all badges (ZIP)</a>
+<section class="toolbar">
+  <div>
+    <p class="eyebrow">Roster workspace</p>
+    <h1>Attendees <span class="count-chip">{{ attendees|length }}</span></h1>
   </div>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Name</th>
-          <th>Company</th>
-          <th>Position</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for attendee in attendees %}
-        <tr>
-          <td>{{ attendee.id }}</td>
-          <td>
-            <form method="post" action="{{ url_for('update_attendee', attendee_id=attendee.id) }}" class="inline">
-              <input type="text" name="name" value="{{ attendee.name }}" required>
-          </td>
-          <td><input type="text" name="company" value="{{ attendee.company }}" required></td>
-          <td><input type="text" name="position" value="{{ attendee.position }}"></td>
-          <td class="actions">
-              <button class="button small" type="submit">Save</button>
-            </form>
-
-            <a class="button small" href="{{ url_for('badge_png', attendee_id=attendee.id) }}">Badge</a>
-
-            <form method="post" action="{{ url_for('delete_attendee', attendee_id=attendee.id) }}" class="inline"
-                  onsubmit="return confirm('Delete attendee {{ attendee.id }}?');">
-              <button class="button danger small" type="submit">Delete</button>
-            </form>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="5">No attendees yet.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="toolbar-actions">
+    <a class="button ghost" href="{{ url_for('empty_badge_png') }}">Empty badge</a>
+    <a class="button" href="{{ url_for('all_badges_zip') }}">Download all badges &middot; ZIP</a>
   </div>
 </section>
+
+<div class="workspace">
+  <aside class="side">
+    <article class="card">
+      <p class="eyebrow">New entry</p>
+      <h2>Add attendee</h2>
+      <form method="post" action="{{ url_for('create_attendee') }}" class="stack">
+        <label for="add-name">Name</label>
+        <input id="add-name" type="text" name="name" required>
+
+        <label for="add-company">Company</label>
+        <input id="add-company" type="text" name="company" required>
+
+        <label for="add-position">Position <span class="optional">optional</span></label>
+        <input id="add-position" type="text" name="position">
+
+        <button class="button block" type="submit">Create attendee</button>
+        <p class="hint">Tip: a <code>|</code> inside any field forces a line break on the printed badge.</p>
+      </form>
+    </article>
+
+    <article class="card">
+      <p class="eyebrow">Bulk import</p>
+      <h2>Import CSV</h2>
+      <form method="post" action="{{ url_for('import_attendees') }}" class="stack" enctype="multipart/form-data">
+        <label for="csv-file">CSV file</label>
+        <input id="csv-file" type="file" name="csv_file" accept=".csv,text/csv">
+
+        <label for="csv-data">&hellip;or paste rows</label>
+        <textarea id="csv-data" name="csv_data" rows="6" placeholder="name,company,position&#10;Ada Lovelace,Analytical Engines,Engineer"></textarea>
+
+        <button class="button ghost block" type="submit">Import rows</button>
+      </form>
+    </article>
+  </aside>
+
+  <section class="card roster">
+    <div class="roster-head">
+      <h2>Roster</h2>
+      <input class="filter" type="search" id="roster-filter"
+             placeholder="Filter by name, company, position&hellip;"
+             {% if not attendees %}disabled{% endif %}>
+    </div>
+
+    <div class="table-wrap">
+      <table id="roster-table">
+        <thead>
+          <tr>
+            <th class="cell-id">Nº</th>
+            <th>Name</th>
+            <th>Company</th>
+            <th>Position</th>
+            <th class="cell-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attendee in attendees %}
+          <tr data-row>
+            <td class="cell-id"><span class="id-chip">{{ '%03d'|format(attendee.id) }}</span></td>
+            <td><input form="edit-{{ attendee.id }}" class="cell-input" type="text" name="name" value="{{ attendee.name }}" required aria-label="Name"></td>
+            <td><input form="edit-{{ attendee.id }}" class="cell-input" type="text" name="company" value="{{ attendee.company }}" required aria-label="Company"></td>
+            <td><input form="edit-{{ attendee.id }}" class="cell-input" type="text" name="position" value="{{ attendee.position }}" aria-label="Position"></td>
+            <td class="cell-actions">
+              <form id="edit-{{ attendee.id }}" method="post" action="{{ url_for('update_attendee', attendee_id=attendee.id) }}"></form>
+              <button class="button small" type="submit" form="edit-{{ attendee.id }}">Save</button>
+              <a class="button small ghost" href="{{ url_for('badge_png', attendee_id=attendee.id) }}">Badge</a>
+              <form method="post" action="{{ url_for('delete_attendee', attendee_id=attendee.id) }}" class="inline"
+                    onsubmit="return confirm('Delete attendee {{ attendee.id }}?');">
+                <button class="button small danger" type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5">
+              <div class="empty">
+                <span class="empty-badge" aria-hidden="true"></span>
+                <p><strong>No attendees yet</strong></p>
+                <p class="hint">Add one on the left, or import a CSV to get started.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var filter = document.getElementById('roster-filter');
+  if (filter) {
+    filter.addEventListener('input', function () {
+      var query = filter.value.trim().toLowerCase();
+      document.querySelectorAll('#roster-table tbody tr[data-row]').forEach(function (row) {
+        var text = Array.from(row.querySelectorAll('input')).map(function (input) {
+          return input.value;
+        }).join(' ').toLowerCase();
+        row.style.display = query && text.indexOf(query) === -1 ? 'none' : '';
+      });
+    });
+  }
+</script>
 {% endblock %}
